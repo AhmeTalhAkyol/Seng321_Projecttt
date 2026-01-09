@@ -10,11 +10,7 @@ from functools import wraps
 # Project internal imports
 from config import Config
 from models.database import db
-<<<<<<< HEAD
-from models.entities import User, Submission, Grade, LearningActivity, LearningGoal, Quiz, Question
-=======
 from models.entities import User, Submission, Grade, LearningActivity, LearningGoal, Quiz, QuizDetail, Question
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
 from services.ai_service import AIService
 from services.ocr_service import OCRService
 from services.grading_service import GradingService
@@ -61,31 +57,6 @@ def create_app():
     # Create Database Tables
     with app.app_context():
         db.create_all()
-
-        # --- Ensure new optional User columns exist (safe for existing SQLite DB) ---
-        from sqlalchemy import text
-        insp = db.inspect(db.engine)
-        existing_cols = {col['name'] for col in insp.get_columns('users')}
-
-        # Helper to add column only if it does not exist
-        def _add_column_if_missing(column_name: str, ddl: str):
-            if column_name not in existing_cols:
-                db.session.execute(text(f"ALTER TABLE users ADD COLUMN {ddl}"))
-                db.session.commit()
-
-        # New profile / personal info fields
-        _add_column_if_missing('profile_image', 'profile_image VARCHAR(200)')
-        _add_column_if_missing('bio', 'bio TEXT')
-        _add_column_if_missing('university', 'university VARCHAR(120)')
-        _add_column_if_missing('grade', 'grade VARCHAR(50)')
-        _add_column_if_missing('teacher', 'teacher VARCHAR(120)')
-        _add_column_if_missing('phone', 'phone VARCHAR(50)')
-        _add_column_if_missing('education_status', 'education_status VARCHAR(80)')
-
-        # AI preference fields
-        _add_column_if_missing('ai_tone', 'ai_tone VARCHAR(20)')
-        _add_column_if_missing('ai_speed', 'ai_speed FLOAT')
-        _add_column_if_missing('weekly_report', 'weekly_report BOOLEAN DEFAULT 1')
 
     # --- AUTHENTICATION CHECK & CACHE CONTROL ---
     @app.before_request
@@ -488,48 +459,6 @@ def create_app():
 
         return render_template('instructor_assignment_create.html')
 
-    @app.route('/instructor/assignments')
-    @role_required('Instructor')
-    def instructor_assignments():
-        activities = LearningActivity.query.order_by(LearningActivity.due_date.asc()).all()
-        now = datetime.utcnow()
-        return render_template('instructor_assignments.html', activities=activities, now=now)
-
-    @app.route('/instructor/assignments/create', methods=['GET', 'POST'])
-    @role_required('Instructor')
-    def instructor_create_assignment():
-        if request.method == 'POST':
-            title = request.form.get('title')
-            activity_type = request.form.get('activity_type')
-            due_date_str = request.form.get('due_date')
-            description = request.form.get('description')
-
-            if not title or not activity_type:
-                flash('Title and type are required.', 'danger')
-                return redirect(url_for('instructor_create_assignment'))
-
-            due_date = None
-            if due_date_str:
-                try:
-                    due_date = datetime.strptime(due_date_str, '%Y-%m-%d')
-                except ValueError:
-                    flash('Invalid date format. Use YYYY-MM-DD.', 'danger')
-                    return redirect(url_for('instructor_create_assignment'))
-
-            new_activity = LearningActivity(
-                instructor_id=current_user.id,
-                title=title,
-                activity_type=activity_type,
-                description=description,
-                due_date=due_date
-            )
-            db.session.add(new_activity)
-            db.session.commit()
-            flash('Assignment created.', 'success')
-            return redirect(url_for('instructor_assignments'))
-
-        return render_template('instructor_assignment_create.html')
-
     @app.route('/speaking')
     @login_required
     def speaking():
@@ -578,14 +507,6 @@ def create_app():
     @app.route('/quiz/start', methods=['GET', 'POST'])
     @login_required
     def start_quiz():
-<<<<<<< HEAD
-        if request.method == 'POST':
-            # Get questions using QuizService
-            questions = QuizService.get_questions(limit=5)
-            
-            if not questions:
-                flash("No questions available. Please contact your instructor.", "danger")
-=======
         activity_id = request.args.get('activity_id', type=int)
         category = None
         
@@ -601,7 +522,6 @@ def create_app():
             
             if not questions:
                 flash("No questions available for this category.", "danger")
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
                 return redirect(url_for('quizzes'))
             
             # Store questions in session for quiz flow
@@ -610,11 +530,8 @@ def create_app():
             session['quiz_answers'] = {}
             session['quiz_current'] = 0
             session['quiz_started'] = True
-<<<<<<< HEAD
-=======
             if activity_id:
                 session['quiz_activity_id'] = activity_id
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
             
             return redirect(url_for('quiz_question'))
         
@@ -631,41 +548,16 @@ def create_app():
         
         question_ids = session.get('quiz_questions', [])
         current_idx = session.get('quiz_current', 0)
-<<<<<<< HEAD
-        answers = session.get('quiz_answers', {})
-        
-        if request.method == 'POST':
-            # Check if this is an AJAX request for instant feedback
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                question_id = request.json.get('question_id', type=int)
-                answer = request.json.get('answer', '')
-                
-                if question_id:
-                    is_correct = QuizService.check_answer(question_id, answer)
-                    question = Question.query.get(question_id)
-                    return jsonify({
-                        'correct': is_correct,
-                        'correct_answer': question.correct_answer if question else None
-                    })
-            
-            # Regular form submission - save answer and move to next
-=======
         # answers stored with string keys in session
         answers = session.get('quiz_answers', {})
         
         if request.method == 'POST':
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
             question_id = request.form.get('question_id', type=int)
             answer = request.form.get('answer', '')
             
             if question_id:
-<<<<<<< HEAD
-                answers[question_id] = answer
-                session['quiz_answers'] = answers
-=======
                 answers[str(question_id)] = answer
                 session['quiz_answers'] = dict(answers)
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
             
             # Move to next question
             current_idx += 1
@@ -704,11 +596,6 @@ def create_app():
         
         # Calculate score using QuizService
         correct, total, score = QuizService.calculate_final_score(question_ids, answers)
-<<<<<<< HEAD
-        
-        # Save quiz result using QuizService
-        QuizService.save_result(current_user.id, "Grammar Quiz", score)
-=======
 
         # Build per-question details for result page
         details = []
@@ -755,17 +642,12 @@ def create_app():
                 flash("Assignment marked as completed!", "success")
         
         QuizService.save_result(current_user.id, quiz_title, score, details=details)
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
         
         # Clear session
         session.pop('quiz_started', None)
         session.pop('quiz_questions', None)
         session.pop('quiz_answers', None)
         session.pop('quiz_current', None)
-<<<<<<< HEAD
-        
-        return render_template('quiz_result.html', score=score, correct=correct, total=total)
-=======
         session.pop('quiz_activity_id', None)
         
         return render_template('quiz_result.html', score=score, correct=correct, total=total, details=details, is_review=False)
@@ -806,7 +688,6 @@ def create_app():
             details=details,
             is_review=True
         )
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
 
     @app.route('/goals', methods=['GET', 'POST'])
     @login_required
@@ -887,12 +768,6 @@ def create_app():
     def profile():
         return render_template('profile.html')
     
-<<<<<<< HEAD
-    @app.route('/settings', methods=['GET'])
-    @login_required
-    def settings():
-        # All updates are handled by dedicated endpoints below; this route only renders the page.
-=======
     @app.route('/settings', methods=['GET', 'POST'])
     @login_required
     def settings():
@@ -921,108 +796,7 @@ def create_app():
             
             return redirect(url_for('settings'))
         
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
         return render_template('settings.html')
-
-    # --- PROFILE & SETTINGS AUXILIARY ROUTES ---
-
-    @app.route('/upload_profile_picture', methods=['POST'])
-    @login_required
-    def upload_profile_picture():
-        from flask import jsonify
-        file = request.files.get('profile_image')
-        if not file or file.filename == '':
-            return jsonify({'success': False, 'message': 'No file provided.'}), 400
-
-        # Ensure profile pictures folder exists
-        profile_folder = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'static/profile_pics')
-        os.makedirs(profile_folder, exist_ok=True)
-
-        filename = secure_filename(file.filename)
-        save_path = os.path.join(profile_folder, filename)
-        file.save(save_path)
-
-        current_user.profile_image = filename
-        try:
-            db.session.commit()
-            return jsonify({'success': True})
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    @app.route('/update_bio', methods=['POST'])
-    @login_required
-    def update_bio():
-        new_bio = request.form.get('new_bio', '').strip()
-        current_user.bio = new_bio or None
-        try:
-            db.session.commit()
-            flash("Bio updated successfully.", "success")
-        except Exception:
-            db.session.rollback()
-            flash("Error updating bio.", "danger")
-        return redirect(url_for('profile'))
-
-    @app.route('/update_personal_info', methods=['POST'])
-    @login_required
-    def update_personal_info():
-        current_user.university = request.form.get('university') or None
-        current_user.grade = request.form.get('grade') or None
-        current_user.teacher = request.form.get('teacher') or None
-        current_user.phone = request.form.get('phone') or None
-        try:
-            db.session.commit()
-            flash("Personal information updated successfully.", "success")
-        except Exception:
-            db.session.rollback()
-            flash("Error updating personal information.", "danger")
-        return redirect(url_for('profile'))
-
-    @app.route('/change_password', methods=['POST'])
-    @login_required
-    def change_password():
-        current_password = request.form.get('current_password')
-        new_password = request.form.get('new_password')
-        confirm_password = request.form.get('confirm_password')
-
-        if not check_password_hash(current_user.password, current_password):
-            flash("Current password is incorrect.", "danger")
-            return redirect(url_for('settings'))
-
-        if not new_password or new_password != confirm_password:
-            flash("New passwords do not match.", "danger")
-            return redirect(url_for('settings'))
-
-        current_user.password = generate_password_hash(new_password, method='pbkdf2:sha256')
-        try:
-            db.session.commit()
-            flash("Password changed successfully.", "success")
-        except Exception:
-            db.session.rollback()
-            flash("Error changing password.", "danger")
-        return redirect(url_for('settings'))
-
-    @app.route('/update_ai_settings', methods=['POST'])
-    @login_required
-    def update_ai_settings():
-        ai_tone = request.form.get('ai_tone') or 'balanced'
-        ai_speed = request.form.get('ai_speed') or '1.0'
-        weekly_report = request.form.get('weekly_report') is not None
-
-        current_user.ai_tone = ai_tone
-        try:
-            current_user.ai_speed = float(ai_speed)
-        except ValueError:
-            current_user.ai_speed = 1.0
-        current_user.weekly_report = weekly_report
-
-        try:
-            db.session.commit()
-            flash("AI preferences saved.", "success")
-        except Exception:
-            db.session.rollback()
-            flash("Error saving AI preferences.", "danger")
-        return redirect(url_for('settings'))
     @app.route('/export')
     @login_required
     def export_data():

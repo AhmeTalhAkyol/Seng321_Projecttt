@@ -47,11 +47,7 @@ An intelligent, full-stack English learning ecosystem designed to enhance studen
 #### Step 1: Clone the Repository
 ```bash
 git clone <your-repository-url>
-<<<<<<< HEAD
-cd <project-folder>
-=======
 cd Seng321_Project-main
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
 ```
 
 #### Step 2: Create Virtual Environment
@@ -76,9 +72,6 @@ python -m pip install -r requirements.txt
 ```
 
 #### Step 4: Configure Environment Variables
-<<<<<<< HEAD
-Create a `.env` file in the project root and add your actual values:
-=======
 1. Copy the example environment file:
    ```bash
    # On Windows (PowerShell):
@@ -89,7 +82,6 @@ Create a `.env` file in the project root and add your actual values:
    ```
 
 2. Edit the `.env` file and add your actual values:
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
    ```env
    # Generate a secret key (run this command):
    # python -c "import secrets; print(secrets.token_hex(16))"

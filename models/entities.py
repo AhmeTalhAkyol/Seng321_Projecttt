@@ -12,23 +12,6 @@ class User(db.Model, UserMixin):
     role = db.Column(db.String(20), default='Student') 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     submissions = db.relationship('Submission', backref='student', lazy=True)
-<<<<<<< HEAD
-
-    # Optional profile fields (added for profile & settings pages)
-    profile_image = db.Column(db.String(200), nullable=True)
-    bio = db.Column(db.Text, nullable=True)
-    university = db.Column(db.String(120), nullable=True)
-    grade = db.Column(db.String(50), nullable=True)
-    teacher = db.Column(db.String(120), nullable=True)
-    phone = db.Column(db.String(50), nullable=True)
-    education_status = db.Column(db.String(80), nullable=True)
-
-    # Optional AI preference fields (used on settings page)
-    ai_tone = db.Column(db.String(20), nullable=True)
-    ai_speed = db.Column(db.Float, nullable=True)
-    weekly_report = db.Column(db.Boolean, default=True)
-=======
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -91,9 +74,6 @@ class Quiz(db.Model):
     score = db.Column(db.Float, nullable=False)
     date_taken = db.Column(db.DateTime, default=datetime.utcnow)
 
-<<<<<<< HEAD
-# --- 7. Question Entity ---
-=======
 # --- 7. QuizDetail Entity (store per-question results) ---
 class QuizDetail(db.Model):
     __tablename__ = 'quiz_details'
@@ -105,7 +85,6 @@ class QuizDetail(db.Model):
     is_correct = db.Column(db.Boolean, default=False)
 
 # --- 8. Question Entity ---
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
 class Question(db.Model):
     __tablename__ = 'questions'
     id = db.Column(db.Integer, primary_key=True)

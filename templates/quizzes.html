@@ -408,14 +408,6 @@
         </div>
     </div>
 
-<<<<<<< HEAD
-    <!-- Content Area - Flex 1, Centered -->
-    <!-- Start Quiz Button -->
-    <div class="start-quiz-section" style="margin: 20px 0; text-align: center;">
-        <a href="{{ url_for('start_quiz') }}" class="btn-start-quiz-large" style="display: inline-block; padding: 15px 30px; background: var(--primary-color); color: white; text-decoration: none; border-radius: 8px; font-size: 1.1rem;">
-            Start New Quiz
-        </a>
-=======
     <!-- Start New Quiz -->
     <div class="start-quiz-section" style="margin: 20px 0; text-align: center;">
         <form action="{{ url_for('start_quiz') }}" method="POST">
@@ -423,7 +415,6 @@
                 Start New Quiz
             </button>
         </form>
->>>>>>> 4d3348b (feat: AI preferences, and instant feedback- Implemented automatic database migrations for newly added user columns.- Added functional routes for profile customization and secure avatar uploads.- Enhanced quiz experience with AJAX-based instant answer validation.- Simplified quiz data persistence by removing the QuizDetail model.)
     </div>
 
     {% if quizzes and quizzes|length > 0 %}
