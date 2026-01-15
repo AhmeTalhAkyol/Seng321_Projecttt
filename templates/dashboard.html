@@ -1,9 +1,8 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}AAFS AI Performance{% endblock %}
 
 {% block extra_css %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
     /* Static dashboard - no scroll */
     .content-wrapper {
@@ -358,6 +357,10 @@
         flex: 1;
         min-height: 240px;  /* Minimum height for chart visibility */
         padding-top: 0;  /* Remove top padding to prevent legend overlap */
+    }
+
+    #chartEmptyState {
+        z-index: 10;
     }
 
     /* Custom Legend Position - Outside Chart Area (Card Header) */
@@ -964,72 +967,139 @@
         color: #818cf8; /* Indigo 400 */
     }
 
-    /* Academic Reports Content */
-    .academic-reports-content {
+    /* Previous Submissions Content - Compact */
+    .previous-submissions-content {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 8px;
         flex: 1;
-        justify-content: center;
-        padding: 8px 0;
+        min-height: 0;
+        padding: 4px 0;
     }
 
-    .academic-reports-description {
-        font-size: 0.8125rem;
-        color: var(--text-secondary);
-        line-height: 1.5;
-        margin: 0;
-        text-align: center;
-    }
-
-    .academic-reports-buttons {
+    .previous-submissions-list {
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        align-items: stretch;
+        gap: 6px;
+        flex: 0 0 auto;
+        padding-right: 4px;
     }
 
-    .export-btn {
-        text-decoration: none;
-        padding: 10px 18px;
-        border-radius: 10px;
-        font-size: 0.875rem;
+    .previous-submission-item {
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: var(--hover-bg);
+        border: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .previous-submission-item:hover {
+        background: var(--active-bg);
+        border-color: var(--accent);
+        transform: translateX(2px);
+    }
+
+    .previous-submission-info {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .previous-submission-type {
+        font-size: 0.6875rem;
         font-weight: 600;
+        color: var(--text-main);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        line-height: 1.2;
+    }
+
+    .previous-submission-date {
+        font-size: 0.625rem;
+        color: var(--text-secondary);
+        line-height: 1.2;
+    }
+
+    .previous-submission-score {
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: var(--accent);
+        flex-shrink: 0;
+    }
+
+    .previous-submission-score.pending {
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 0.75rem;
+    }
+
+    .view-all-history-btn {
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .view-all-history-btn a {
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 8px;
+        gap: 6px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: var(--white);
+        text-decoration: none;
+        font-size: 0.8125rem;
+        font-weight: 600;
         transition: all 0.2s ease;
-        border: none;
-        cursor: pointer;
     }
 
-    .export-btn-pdf {
-        background: #ff4757;
-        color: #fff !important;
-        box-shadow: 0 4px 15px rgba(255, 71, 87, 0.3);
+    .view-all-history-btn a:hover {
+        background: var(--accent-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 3px 10px rgba(99, 102, 241, 0.3);
     }
 
-    .export-btn-pdf:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255, 71, 87, 0.4);
-    }
-
-    .export-btn-csv {
-        background: #2ed573;
-        color: #fff !important;
-        box-shadow: 0 4px 15px rgba(46, 213, 115, 0.3);
-    }
-
-    .export-btn-csv:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(46, 213, 115, 0.4);
-    }
-
-    .export-btn svg {
-        width: 16px;
-        height: 16px;
+    .view-all-history-btn a svg {
+        width: 14px;
+        height: 14px;
         flex-shrink: 0;
+    }
+
+    .previous-submissions-empty {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        flex: 1;
+        padding: 24px 16px;
+        gap: 6px;
+    }
+
+    .previous-submissions-empty-icon {
+        width: 20px;
+        height: 20px;
+        opacity: 0.4;
+        color: var(--text-secondary);
+    }
+
+    .previous-submissions-empty-icon svg {
+        width: 20px;
+        height: 20px;
+        stroke-width: 2;
+    }
+
+    .previous-submissions-empty-text {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
     }
 
     /* Learning Progress & Streak Card */
@@ -1391,6 +1461,10 @@
                 </div>
                 <div class="chart-box">
                     <canvas id="scoreChart"></canvas>
+                    <div id="chartEmptyState" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+                        <p>No score data available yet.</p>
+                        <p style="font-size: 0.75rem; margin-top: 4px;">Complete some activities to see your progress!</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1421,33 +1495,66 @@
                 </div>
             </div>
 
-            <!-- Academic Reports - Right -->
+            <!-- Previous Submissions - Right -->
             <div class="academic-reports-section">
                 <div class="glass-card deadlines-card">
                     <div class="card-header">
-                        <h3 class="card-title">Academic Reports</h3>
+                        <h3 class="card-title">Previous Submissions</h3>
                     </div>
-                    <div class="academic-reports-content">
-                        <p class="academic-reports-description">Export your full academic history to PDF or CSV files.</p>
-                        <div class="academic-reports-buttons">
-                            <a href="/export/pdf" download class="export-btn export-btn-pdf">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <div class="previous-submissions-content">
+                        {% if recent_submissions and recent_submissions|length > 0 %}
+                        <div class="previous-submissions-list">
+                            {% set reversed_subs = recent_submissions|reverse|list %}
+                            {% for sub in reversed_subs %}
+                                {% if loop.index <= 3 %}
+                                {% set score = sub.grade.score if sub.grade else None %}
+                                <div class="previous-submission-item" onclick="window.location.href='/feedback/{{ sub.id }}'">
+                                    <div class="previous-submission-info">
+                                        <div class="previous-submission-type">{{ sub.submission_type }}</div>
+                                        <div class="previous-submission-date">{{ sub.created_at.strftime('%b %d, %Y') if sub.created_at else 'N/A' }}</div>
+                                    </div>
+                                    <div class="previous-submission-score {% if score is none %}pending{% endif %}">
+                                        {% if score is not none %}
+                                            {{ score }}%
+                                        {% else %}
+                                            Pending
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="view-all-history-btn">
+                            <a href="/history">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                                View All History
+                            </a>
+                        </div>
+                        {% else %}
+                        <div class="previous-submissions-empty">
+                            <div class="previous-submissions-empty-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                     <polyline points="14 2 14 8 20 8"></polyline>
                                     <line x1="16" y1="13" x2="8" y2="13"></line>
                                     <line x1="16" y1="17" x2="8" y2="17"></line>
                                 </svg>
-                                Export PDF
-                            </a>
-                            <a href="/export/csv" download class="export-btn export-btn-csv">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="7 10 12 15 17 10"></polyline>
-                                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                                </svg>
-                                Export CSV
-                            </a>
+                            </div>
+                            <div class="previous-submissions-empty-text">No submissions yet</div>
+                            <div class="view-all-history-btn" style="margin-top: 8px; border-top: none; padding-top: 0;">
+                                <a href="/history">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    View History
+                                </a>
+                            </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -1521,6 +1628,44 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+    // Load Chart.js and initialize chart when ready
+    (function() {
+        // Check if Chart.js is already loaded
+        if (typeof Chart !== 'undefined') {
+            console.log('Chart.js already loaded');
+            // Wait for DOM to be ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initializeScoreChart);
+            } else {
+                initializeScoreChart();
+            }
+        } else {
+            // Load Chart.js dynamically
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+            script.async = false; // Load synchronously to ensure it's available
+            script.onload = function() {
+                console.log('Chart.js loaded successfully');
+                // Wait for DOM to be ready
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', initializeScoreChart);
+                } else {
+                    initializeScoreChart();
+                }
+            };
+            script.onerror = function() {
+                console.error('Failed to load Chart.js');
+                const emptyState = document.getElementById('chartEmptyState');
+                if (emptyState) {
+                    emptyState.style.display = 'block';
+                    emptyState.innerHTML = '<p>Chart library failed to load.</p><p style="font-size: 0.75rem; margin-top: 4px;">Please check your internet connection and refresh.</p>';
+                }
+            };
+            document.head.appendChild(script);
+        }
+    })();
+</script>
 <script>
     // Set current date and motivation (matching Instructor page)
     (function() {
@@ -1599,9 +1744,21 @@
     })();
 
     // Multi-Line Spline Chart - Score Progress History
-    (function() {
-        const chartCanvas = document.getElementById('scoreChart');
-        if (!chartCanvas) return;
+    function initializeScoreChart() {
+        // Check if Chart.js is loaded
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js is not available');
+            return;
+        }
+
+        console.log('Initializing score chart...');
+        
+        function createChart() {
+            const chartCanvas = document.getElementById('scoreChart');
+        if (!chartCanvas) {
+            console.error('Chart canvas element not found');
+            return;
+        }
 
         // Get data from backend
         let chartLabels = [];
@@ -1610,21 +1767,50 @@
         let quizData = [];
         let handwrittenData = [];
 
-        {% if chart_data and chart_data.dates %}
+        {% if chart_data %}
+        // Check if chart_data exists and has dates
+        {% if chart_data.dates and chart_data.dates|length > 0 %}
         chartLabels = {{ chart_data.dates | tojson }};
         speakingData = {{ chart_data.speaking_scores | tojson }};
         writingData = {{ chart_data.writing_scores | tojson }};
         quizData = {{ chart_data.quiz_scores | tojson }};
         handwrittenData = {{ chart_data.handwritten_scores | tojson }};
+        console.log('Chart data loaded from backend:', {
+            labels: chartLabels.length,
+            speaking: speakingData.length,
+            writing: writingData.length,
+            quiz: quizData.length,
+            handwritten: handwrittenData.length,
+            firstLabel: chartLabels[0],
+            firstSpeaking: speakingData[0],
+            firstWriting: writingData[0]
+        });
+        {% else %}
+        // chart_data exists but dates array is empty
+        chartLabels = [];
+        speakingData = [];
+        writingData = [];
+        quizData = [];
+        handwrittenData = [];
+        console.log('chart_data exists but dates array is empty');
+        {% endif %}
+        {% else %}
+        // No chart_data from backend at all
+        chartLabels = [];
+        speakingData = [];
+        writingData = [];
+        quizData = [];
+        handwrittenData = [];
+        console.log('No chart_data object from backend');
         {% endif %}
 
         // Convert data to numbers and handle null/undefined values
         const convertToNumber = (value) => {
             if (value === null || value === undefined || value === '') {
-                return 0;
+                return null; // Use null for missing data points
             }
             const num = Number(value);
-            return isNaN(num) ? 0 : num;
+            return isNaN(num) ? null : num;
         };
 
         speakingData = speakingData.map(convertToNumber);
@@ -1632,15 +1818,60 @@
         quizData = quizData.map(convertToNumber);
         handwrittenData = handwrittenData.map(convertToNumber);
 
-        // Check if all data is zero
-        const allZero = speakingData.every(v => v === 0) && 
-                       writingData.every(v => v === 0) && 
-                       quizData.every(v => v === 0) &&
-                       handwrittenData.every(v => v === 0);
+        // Check if we have any real data (non-zero values)
+        const hasNonZeroData = chartLabels.length > 0 && (
+            speakingData.some(v => v !== null && v !== 0 && v !== undefined) ||
+            writingData.some(v => v !== null && v !== 0 && v !== undefined) ||
+            quizData.some(v => v !== null && v !== 0 && v !== undefined) ||
+            handwrittenData.some(v => v !== null && v !== 0 && v !== undefined)
+        );
+
+        console.log('Has non-zero data:', hasNonZeroData, 'Labels:', chartLabels.length);
+
+        // If no data, show empty state instead of chart
+        if (!hasNonZeroData) {
+            console.log('Showing empty state - no data available');
+            const emptyState = document.getElementById('chartEmptyState');
+            if (emptyState) {
+                emptyState.style.display = 'block';
+                chartCanvas.style.display = 'none';
+            }
+            return; // Don't create chart if no data
+        }
+
+        // Hide empty state if we have data
+        console.log('Creating chart with data');
+        const emptyState = document.getElementById('chartEmptyState');
+        if (emptyState) {
+            emptyState.style.display = 'none';
+        }
+        chartCanvas.style.display = 'block';
 
         // Create the multi-line chart
         const ctx = chartCanvas.getContext('2d');
-        new Chart(ctx, {
+        
+        // Ensure canvas is visible
+        chartCanvas.style.display = 'block';
+        chartCanvas.style.width = '100%';
+        chartCanvas.style.height = '100%';
+        
+        console.log('Creating chart with', chartLabels.length, 'data points');
+        console.log('Canvas dimensions:', chartCanvas.offsetWidth, 'x', chartCanvas.offsetHeight);
+        console.log('Data sample:', {
+            labels: chartLabels.slice(0, 3),
+            speaking: speakingData.slice(0, 3),
+            writing: writingData.slice(0, 3),
+            quiz: quizData.slice(0, 3),
+            handwritten: handwrittenData.slice(0, 3)
+        });
+        
+        try {
+            // Destroy existing chart if it exists
+            if (window.scoreChartInstance) {
+                window.scoreChartInstance.destroy();
+            }
+            
+            window.scoreChartInstance = new Chart(ctx, {
             type: 'line',
             data: {
                 labels: chartLabels,
@@ -1769,7 +2000,7 @@
                             color: 'var(--text-secondary)',
                             font: { size: 11 },
                             padding: 8,
-                            stepSize: allZero ? 20 : undefined,
+                            stepSize: 20,
                             callback: function(value) {
                                 return value + '%';
                             }
@@ -1789,7 +2020,23 @@
                     }
                 }
             }
-        });
-    })();
+            });
+            
+            console.log('Chart created successfully!');
+            
+            } catch (error) {
+                console.error('Error creating chart:', error);
+                console.error('Error details:', error.message, error.stack);
+                const emptyState = document.getElementById('chartEmptyState');
+                if (emptyState) {
+                    emptyState.style.display = 'block';
+                    chartCanvas.style.display = 'none';
+                }
+            }
+        }
+        
+        // Create chart immediately
+        createChart();
+    }
 </script>
 {% endblock %}
