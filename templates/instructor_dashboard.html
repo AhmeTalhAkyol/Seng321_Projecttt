@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Class Management - AAFS AI{% endblock %}
 
@@ -493,6 +493,74 @@
 
     [data-theme="dark"] .success-rate-summary-label {
         color: #cbd5e1 !important; /* Light gray label in dark mode */
+    }
+
+    /* Success Rate Summary Base Styles */
+    .success-rate-summary {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        margin-top: 24px;
+        gap: 8px;
+    }
+
+    .success-rate-summary-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .success-rate-summary-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+    }
+
+    /* Grade Stats Container - Total Submission and Average */
+    .grade-stats-container {
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        gap: 24px;
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .grade-stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+    }
+
+    .grade-stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-main);
+    }
+
+    .grade-stat-label {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+        text-align: center;
+    }
+
+    /* Dark Mode - Grade Stats */
+    [data-theme="dark"] .grade-stat-value {
+        color: #f8fafc !important;
+    }
+
+    [data-theme="dark"] .grade-stat-label {
+        color: #cbd5e1 !important;
+    }
+
+    [data-theme="dark"] .grade-stats-container {
+        border-top-color: #334155 !important;
     }
 
     /* Grade Distribution Legend Text Color - Dark Mode Fix */
@@ -1203,6 +1271,17 @@
             <div class="success-rate-summary-value" id="successPercentage">0%</div>
             <div class="success-rate-summary-label">Success Rate</div>
         </div>
+        <!-- Additional Stats -->
+        <div class="grade-stats-container">
+            <div class="grade-stat-item">
+                <div class="grade-stat-value" id="totalSubmissions">0</div>
+                <div class="grade-stat-label">Total Submission</div>
+            </div>
+            <div class="grade-stat-item">
+                <div class="grade-stat-value" id="averageScore">0</div>
+                <div class="grade-stat-label">Average</div>
+            </div>
+        </div>
                     </div>
 </div>
 
@@ -1525,36 +1604,36 @@
             empty: '#e5e7eb'    // Gray for no data
         };
         
-        // Determine dominant category and calculate percentage
-        let dominantCategory = 'none';
-        let dominantPercentage = 0;
-        let dominantColor = gradeColors.empty;
+        // Calculate success rate as mid + high combined
+        let successRate = 0;
+        let successColor = gradeColors.empty;
         
         if (totalGraded > 0) {
             const highPct = (highCount / totalGraded) * 100;
             const midPct = (midCount / totalGraded) * 100;
-            const lowPct = (lowCount / totalGraded) * 100;
-            
-            if (highCount >= midCount && highCount >= lowCount) {
-                dominantCategory = 'high';
-                dominantPercentage = Math.round(highPct);
-                dominantColor = gradeColors.high;
-            } else if (midCount >= lowCount) {
-                dominantCategory = 'mid';
-                dominantPercentage = Math.round(midPct);
-                dominantColor = gradeColors.mid;
-            } else {
-                dominantCategory = 'low';
-                dominantPercentage = Math.round(lowPct);
-                dominantColor = gradeColors.low;
-            }
+            // Success rate is mid + high combined
+            successRate = Math.round(highPct + midPct);
+            // Use green color for success (mid+high combined)
+            successColor = gradeColors.high;
         }
         
         // Update success rate summary label below chart
         const successElement = document.getElementById('successPercentage');
         if (successElement) {
-            successElement.textContent = totalGraded > 0 ? dominantPercentage + '%' : '0%';
-            successElement.style.color = totalGraded > 0 ? dominantColor : 'var(--text-main)';
+            successElement.textContent = totalGraded > 0 ? successRate + '%' : '0%';
+            successElement.style.color = totalGraded > 0 ? successColor : 'var(--text-main)';
+        }
+        
+        // Update Total Submissions
+        const totalSubmissionsElement = document.getElementById('totalSubmissions');
+        if (totalSubmissionsElement) {
+            totalSubmissionsElement.textContent = {{ submissions | length | tojson }};
+        }
+        
+        // Update Average Score
+        const averageScoreElement = document.getElementById('averageScore');
+        if (averageScoreElement) {
+            averageScoreElement.textContent = {{ class_avg | tojson }};
         }
         
         // Prepare chart data - show placeholder ring if no data

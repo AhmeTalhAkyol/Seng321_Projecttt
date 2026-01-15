@@ -1,7 +1,7 @@
 import os
 import io
 import csv
-from datetime import datetime 
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, make_response, send_file, Response
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -44,6 +44,22 @@ def create_app():
 
     # Initialize Database
     db.init_app(app)
+    
+    # Helper function to convert UTC to GMT+3 (Turkey timezone)
+    def utc_to_gmt3(utc_dt):
+        """Convert UTC datetime to GMT+3 timezone"""
+        if utc_dt is None:
+            return None
+        # GMT+3 is UTC+3
+        gmt3_offset = timedelta(hours=3)
+        if utc_dt.tzinfo is None:
+            # If naive datetime, assume it's UTC
+            utc_dt = utc_dt.replace(tzinfo=timezone.utc)
+        return (utc_dt + gmt3_offset).replace(tzinfo=None)
+    
+    def get_gmt3_now():
+        """Get current time in GMT+3"""
+        return utc_to_gmt3(datetime.utcnow())
 
     # Login Manager Setup
     login_manager = LoginManager()
@@ -1095,8 +1111,8 @@ def create_app():
         try:
             from models.entities import Submission
             
-            # Get all submissions for the current user
-            submissions = db.session.query(Submission).filter_by(student_id=current_user.id).order_by(Submission.created_at.desc()).all()
+            # Get all submissions for the current user, sorted chronologically (oldest first)
+            submissions = db.session.query(Submission).filter_by(student_id=current_user.id).order_by(Submission.created_at.asc()).all()
             
             # Create PDF buffer
             buffer = io.BytesIO()
@@ -1104,43 +1120,62 @@ def create_app():
                 p = canvas.Canvas(buffer, pagesize=letter)
                 width, height = letter
                 
+                # Define consistent font sizes for entire document
+                TITLE_FONT_SIZE = 18
+                HEADER_INFO_FONT_SIZE = 11
+                TABLE_HEADER_FONT_SIZE = 11
+                TABLE_DATA_FONT_SIZE = 10
+                
                 # Header section
-                p.setFont("Helvetica-Bold", 18)
+                p.setFont("Helvetica-Bold", TITLE_FONT_SIZE)
                 p.drawString(100, height - 50, "AAFS AI - Academic Progress Report")
-                p.setFont("Helvetica", 12)
+                p.setFont("Helvetica", HEADER_INFO_FONT_SIZE)
                 p.drawString(100, height - 80, f"Student: {current_user.username}")
-                p.drawString(100, height - 100, f"Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}")
+                # Use GMT+3 for generated time
+                generated_time = get_gmt3_now()
+                p.drawString(100, height - 100, f"Generated: {generated_time.strftime('%Y-%m-%d %H:%M')} (GMT+3)")
                 p.line(100, height - 110, 500, height - 110)
                 
                 if submissions:
-                    # Table headers
+                    
+                    # Table headers - adjusted column positions
                     y = height - 130
-                    p.setFont("Helvetica-Bold", 11)
-                    p.drawString(100, y, "Date")
-                    p.drawString(200, y, "Type")
-                    p.drawString(350, y, "Score")
+                    p.setFont("Helvetica-Bold", TABLE_HEADER_FONT_SIZE)
+                    p.drawString(100, y, "Submission Date")
+                    p.drawString(280, y, "Type")
+                    p.drawString(380, y, "Score")
                     p.line(100, y - 5, 500, y - 5)
                     
                     # Table rows
-                    p.setFont("Helvetica", 10)
+                    p.setFont("Helvetica", TABLE_DATA_FONT_SIZE)
                     y -= 25
                     
                     for sub in submissions:
                         # Check if we need a new page
                         if y < 100:
                             p.showPage()
-                            y = height - 50
+                            # Re-draw headers on new page with same font sizes
+                            y = height - 130
+                            p.setFont("Helvetica-Bold", TABLE_HEADER_FONT_SIZE)
+                            p.drawString(100, y, "Submission Date")
+                            p.drawString(280, y, "Type")
+                            p.drawString(380, y, "Score")
+                            p.line(100, y - 5, 500, y - 5)
+                            # Set data font for rows
+                            p.setFont("Helvetica", TABLE_DATA_FONT_SIZE)
+                            y -= 25
                         
                         try:
                             # Get score safely
                             if sub.grade and sub.grade.score is not None:
                                 score = sub.grade.score
                             else:
-                                score = 0
+                                score = 'N/A'
                             
-                            # Format date safely
+                            # Format submission date with time in GMT+3
                             if sub.created_at:
-                                date_str = sub.created_at.strftime('%Y-%m-%d')
+                                sub_date_gmt3 = utc_to_gmt3(sub.created_at)
+                                date_str = sub_date_gmt3.strftime('%Y-%m-%d %H:%M')
                             else:
                                 date_str = 'N/A'
                             
@@ -1152,8 +1187,8 @@ def create_app():
                             
                             # Draw row
                             p.drawString(100, y, date_str)
-                            p.drawString(200, y, type_str)
-                            p.drawString(350, y, f"{score}%")
+                            p.drawString(280, y, type_str)
+                            p.drawString(380, y, f"{score}%" if isinstance(score, (int, float)) else str(score))
                             
                             y -= 20
                         except Exception as e:
@@ -1162,7 +1197,7 @@ def create_app():
                 else:
                     # No submissions message
                     y = height - 130
-                    p.setFont("Helvetica", 12)
+                    p.setFont("Helvetica", HEADER_INFO_FONT_SIZE)
                     p.drawString(100, y, "No submissions found.")
                 
                 # Finalize and save PDF
@@ -1172,8 +1207,8 @@ def create_app():
                 # Ensure buffer is ready for reading
                 buffer.seek(0)
             
-            # Generate filename
-            filename = f"academic_report_{current_user.id}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+            # Generate filename with GMT+3 date
+            filename = f"academic_report_{current_user.id}_{get_gmt3_now().strftime('%Y%m%d')}.pdf"
             
             # Get PDF bytes
             pdf_bytes = buffer.getvalue()
@@ -1199,27 +1234,60 @@ def create_app():
     def export_csv():
         """Export student submissions to CSV"""
         from models.entities import Submission
-        submissions = Submission.query.filter_by(student_id=current_user.id).all()
+        submissions = Submission.query.filter_by(student_id=current_user.id).order_by(Submission.created_at.asc()).all()
         output = io.StringIO()
         writer = csv.writer(output)
         
-        # Headers
-        writer.writerow(['Date', 'Assignment Type', 'Score', 'AI Feedback'])
+        # Clean, readable headers in English
+        writer.writerow(['Date', 'Submission Type', 'Score', 'Status', 'Feedback'])
         
         for sub in submissions:
-            score = sub.grade.score if sub.grade else 0
-            feedback = sub.grade.general_feedback if sub.grade else "No feedback"
+            # Format score
+            if sub.grade and sub.grade.score is not None:
+                score = f"{sub.grade.score:.1f}"
+                status = 'Graded' if sub.grade.instructor_approved else 'Pending'
+            else:
+                score = '-'
+                status = 'Not Graded'
+            
+            # Format submission date to GMT+3 - more readable format
+            if sub.created_at:
+                sub_date_gmt3 = utc_to_gmt3(sub.created_at)
+                date_str = sub_date_gmt3.strftime('%Y-%m-%d %H:%M') if sub_date_gmt3 else 'N/A'
+            else:
+                date_str = 'N/A'
+            
+            # Format submission type - readable English names
+            type_map = {
+                'WRITING': 'Writing',
+                'SPEAKING': 'Speaking',
+                'HANDWRITTEN': 'Handwritten',
+                'QUIZ': 'Quiz'
+            }
+            submission_type = type_map.get(sub.submission_type, sub.submission_type.capitalize())
+            
+            # Format feedback - clean and concise
+            if sub.grade and sub.grade.general_feedback:
+                # Clean feedback: remove extra whitespace, limit length
+                feedback = sub.grade.general_feedback.strip()
+                # Limit to 150 characters for readability
+                if len(feedback) > 150:
+                    feedback = feedback[:147] + '...'
+            else:
+                feedback = '-'
+            
             writer.writerow([
-                sub.created_at.strftime('%Y-%m-%d'), 
-                sub.submission_type, 
-                f"{score}%", 
+                date_str, 
+                submission_type, 
+                score, 
+                status,
                 feedback
             ])
         
         return Response(
             output.getvalue(),
             mimetype="text/csv",
-            headers={"Content-disposition": "attachment; filename=progress_report.csv"}
+            headers={"Content-disposition": "attachment; filename=academic_report.csv"}
         )
 
     @app.route('/export')
@@ -1320,6 +1388,201 @@ def create_app():
             avg_score=avg_score,
             total_submissions=total_submissions,
             pending_submissions=pending_submissions
+        )
+
+    @app.route('/instructor/export/pdf/<int:student_id>')
+    @role_required('Instructor')
+    def instructor_export_pdf(student_id):
+        """Export student submissions to PDF for instructor"""
+        # Verify student exists and is a student
+        student = User.query.filter_by(id=student_id, role='Student').first_or_404()
+        
+        # Check if reportlab is available
+        if not REPORTLAB_AVAILABLE:
+            return "PDF generation requires reportlab library. Please install with: pip install reportlab", 500
+        
+        try:
+            from models.entities import Submission
+            
+            # Get all submissions for the specified student, sorted chronologically (oldest first)
+            submissions = db.session.query(Submission).filter_by(student_id=student_id).order_by(Submission.created_at.asc()).all()
+            
+            # Create PDF buffer
+            buffer = io.BytesIO()
+            try:
+                p = canvas.Canvas(buffer, pagesize=letter)
+                width, height = letter
+                
+                # Define consistent font sizes for entire document
+                TITLE_FONT_SIZE = 18
+                HEADER_INFO_FONT_SIZE = 11
+                TABLE_HEADER_FONT_SIZE = 11
+                TABLE_DATA_FONT_SIZE = 10
+                
+                # Header section
+                p.setFont("Helvetica-Bold", TITLE_FONT_SIZE)
+                p.drawString(100, height - 50, "AAFS AI - Academic Progress Report")
+                p.setFont("Helvetica", HEADER_INFO_FONT_SIZE)
+                p.drawString(100, height - 80, f"Student: {student.username}")
+                # Use GMT+3 for generated time
+                generated_time = get_gmt3_now()
+                p.drawString(100, height - 100, f"Generated: {generated_time.strftime('%Y-%m-%d %H:%M')} (GMT+3)")
+                p.line(100, height - 110, 500, height - 110)
+                
+                if submissions:
+                    # Table headers - adjusted column positions
+                    y = height - 130
+                    p.setFont("Helvetica-Bold", TABLE_HEADER_FONT_SIZE)
+                    p.drawString(100, y, "Submission Date")
+                    p.drawString(280, y, "Type")
+                    p.drawString(380, y, "Score")
+                    p.line(100, y - 5, 500, y - 5)
+                    
+                    # Table rows
+                    p.setFont("Helvetica", TABLE_DATA_FONT_SIZE)
+                    y -= 25
+                    
+                    for sub in submissions:
+                        # Check if we need a new page
+                        if y < 100:
+                            p.showPage()
+                            # Re-draw headers on new page with same font sizes
+                            y = height - 130
+                            p.setFont("Helvetica-Bold", TABLE_HEADER_FONT_SIZE)
+                            p.drawString(100, y, "Submission Date")
+                            p.drawString(280, y, "Type")
+                            p.drawString(380, y, "Score")
+                            p.line(100, y - 5, 500, y - 5)
+                            # Set data font for rows
+                            p.setFont("Helvetica", TABLE_DATA_FONT_SIZE)
+                            y -= 25
+                        
+                        try:
+                            # Get score safely
+                            if sub.grade and sub.grade.score is not None:
+                                score = sub.grade.score
+                            else:
+                                score = 'N/A'
+                            
+                            # Format submission date with time in GMT+3
+                            if sub.created_at:
+                                sub_date_gmt3 = utc_to_gmt3(sub.created_at)
+                                date_str = sub_date_gmt3.strftime('%Y-%m-%d %H:%M')
+                            else:
+                                date_str = 'N/A'
+                            
+                            # Format type safely
+                            if sub.submission_type:
+                                type_str = sub.submission_type.capitalize()
+                            else:
+                                type_str = 'Unknown'
+                            
+                            # Draw row
+                            p.drawString(100, y, date_str)
+                            p.drawString(280, y, type_str)
+                            p.drawString(380, y, f"{score}%" if isinstance(score, (int, float)) else str(score))
+                            
+                            y -= 20
+                        except Exception as e:
+                            # Skip problematic submissions and continue
+                            continue
+                else:
+                    # No submissions message
+                    y = height - 130
+                    p.setFont("Helvetica", HEADER_INFO_FONT_SIZE)
+                    p.drawString(100, y, "No submissions found.")
+                
+                # Finalize and save PDF
+                p.showPage()
+                p.save()
+            finally:
+                # Ensure buffer is ready for reading
+                buffer.seek(0)
+            
+            # Generate filename with GMT+3 date
+            filename = f"academic_report_{student.username}_{get_gmt3_now().strftime('%Y%m%d')}.pdf"
+            
+            # Get PDF bytes
+            pdf_bytes = buffer.getvalue()
+            buffer.close()
+            
+            # Create response with PDF data
+            response = make_response(pdf_bytes)
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+            response.headers['Content-Length'] = str(len(pdf_bytes))
+            
+            return response
+            
+        except Exception as e:
+            import traceback
+            error_msg = str(e)
+            traceback.print_exc()
+            # Return error as text instead of redirecting
+            return f"Error generating PDF: {error_msg}", 500
+
+    @app.route('/instructor/export/csv/<int:student_id>')
+    @role_required('Instructor')
+    def instructor_export_csv(student_id):
+        """Export student submissions to CSV for instructor"""
+        # Verify student exists and is a student
+        student = User.query.filter_by(id=student_id, role='Student').first_or_404()
+        
+        from models.entities import Submission
+        submissions = Submission.query.filter_by(student_id=student_id).order_by(Submission.created_at.asc()).all()
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Clean, readable headers in English
+        writer.writerow(['Date', 'Submission Type', 'Score', 'Status', 'Feedback'])
+        
+        for sub in submissions:
+            # Format score
+            if sub.grade and sub.grade.score is not None:
+                score = f"{sub.grade.score:.1f}"
+                status = 'Graded' if sub.grade.instructor_approved else 'Pending'
+            else:
+                score = '-'
+                status = 'Not Graded'
+            
+            # Format submission date to GMT+3 - more readable format
+            if sub.created_at:
+                sub_date_gmt3 = utc_to_gmt3(sub.created_at)
+                date_str = sub_date_gmt3.strftime('%Y-%m-%d %H:%M') if sub_date_gmt3 else 'N/A'
+            else:
+                date_str = 'N/A'
+            
+            # Format submission type - readable English names
+            type_map = {
+                'WRITING': 'Writing',
+                'SPEAKING': 'Speaking',
+                'HANDWRITTEN': 'Handwritten',
+                'QUIZ': 'Quiz'
+            }
+            submission_type = type_map.get(sub.submission_type, sub.submission_type.capitalize())
+            
+            # Format feedback - clean and concise
+            if sub.grade and sub.grade.general_feedback:
+                # Clean feedback: remove extra whitespace, limit length
+                feedback = sub.grade.general_feedback.strip()
+                # Limit to 150 characters for readability
+                if len(feedback) > 150:
+                    feedback = feedback[:147] + '...'
+            else:
+                feedback = '-'
+            
+            writer.writerow([
+                date_str, 
+                submission_type, 
+                score, 
+                status,
+                feedback
+            ])
+        
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": f'attachment; filename=academic_report_{student.username}.csv'}
         )
 
     @app.route('/instructor/analytics')
