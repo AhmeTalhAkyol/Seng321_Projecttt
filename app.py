@@ -312,12 +312,12 @@ def create_app():
         
         # Username kontrolü
         if User.query.filter_by(username=username).first():
-            flash("This username is already in use! Please choose a different username.", "danger")
+            flash("❌ Bu kullanıcı adı zaten kullanılıyor! Lütfen farklı bir kullanıcı adı seçin.", "danger")
             return redirect(url_for('login', mode='register'))
         
         # Email kontrolü
         if User.query.filter_by(email=email).first():
-            flash("This email address is already registered! Please use a different email address.", "danger")
+            flash("❌ Bu e-posta adresi zaten kayıtlı! Lütfen farklı bir e-posta adresi kullanın.", "danger")
             return redirect(url_for('login', mode='register'))
         
         try:
@@ -325,11 +325,11 @@ def create_app():
             new_user = User(username=username, email=email, password=hashed_pw, role=role)
             db.session.add(new_user)
             db.session.commit()
-            flash("Registration successful! You can now login.", "success")
-            return redirect(url_for('login', registered=1))
+            flash("✅ Kayıt başarılı! Hesabınız oluşturuldu. Şimdi giriş yapabilirsiniz.", "success")
+            return redirect(url_for('login'))
         except Exception as e:
             db.session.rollback()
-            flash("Registration failed. Please try again.", "danger")
+            flash("❌ Kayıt sırasında bir hata oluştu. Lütfen tekrar deneyin.", "danger")
             return redirect(url_for('login', mode='register'))
 
     @app.route('/login', methods=['GET', 'POST'])
@@ -343,8 +343,8 @@ def create_app():
             else:
                 return redirect(url_for('dashboard'))
         
-        # Clear flash messages on GET request (when coming from logout, but not from register)
-        if request.method == 'GET' and not request.args.get('registered'):
+        # Clear flash messages on GET request (when coming from logout)
+        if request.method == 'GET':
             from flask import session
             session.pop('_flashes', None)
         
@@ -940,12 +940,11 @@ def create_app():
         now = datetime.utcnow()
         
         # Use SQL with LEFT JOIN + GROUP BY for efficient stats calculation
-        # Calculate: Total submissions, Graded (instructor_approved=True), Pending (instructor_approved=False or NULL)
+        # Calculate: Total submissions, Graded (score NOT NULL), Pending (score NULL or no grade)
         stats_query = db.session.query(
             LearningActivity,
             func.count(func.distinct(Submission.id)).label('total_submissions'),
-            func.sum(case((Grade.instructor_approved == True, 1), else_=0)).label('graded_submissions'),
-            func.sum(case((Grade.instructor_approved == False, 1), else_=0)).label('pending_submissions')
+            func.sum(case((Grade.score.isnot(None), 1), else_=0)).label('graded_submissions')
         ).outerjoin(Submission, Submission.activity_id == LearningActivity.id)\
          .outerjoin(Grade, Grade.submission_id == Submission.id)\
          .group_by(LearningActivity.id)\
@@ -953,12 +952,12 @@ def create_app():
         
         # Build activity_stats list from query results
         activity_stats = []
-        for activity, total, graded, pending in stats_query:
+        for activity, total, graded in stats_query:
             # Handle None values from SQL (when no submissions exist)
             total_submissions = total or 0
             graded_submissions = int(graded) if graded else 0
-            # Pending = submissions with grade but instructor_approved = False
-            pending_submissions = int(pending) if pending else 0
+            # Pending = Total - Graded (submissions without grade or with NULL score)
+            pending_submissions = total_submissions - graded_submissions
             
             # Get courses for this activity
             # activity.courses is already a list (InstrumentedList), no need for .all()
